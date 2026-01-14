@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محول SVG - تحويل الصور إلى رسومات متجهية</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #FAF9F7;
+            --bg-secondary: #F5F4F2;
+            --bg-white: #FFFFFF;
+            --text-primary: #1A1915;
+            --text-secondary: #6B6963;
+            --text-light: #9B9A97;
+            --border-color: #E5E4E2;
+            --accent-primary: #D97757;
+            --accent-hover: #C4684A;
+            --accent-light: #FDF4F1;
+            --success: #22C55E;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--bg-white);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+        }
+
+        .sidebar {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            height: fit-content;
+            position: sticky;
+            top: 100px;
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .setting-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .setting-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.625rem 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .radio-option:hover {
+            background: var(--bg-secondary);
+        }
+
+        .radio-option input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent-primary);
+        }
+
+        .range-container {
+            padding: 0.5rem 0;
+        }
+
+        .range-slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .range-value {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .scale-options {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .scale-btn {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-white);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .scale-btn:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .scale-btn.active {
+            background: var(--accent-light);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+            font-weight: 500;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .upload-area {
+            background: var(--bg-white);
+            border: 2px dashed var(--border-color);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--accent-primary);
+            background: var(--accent-light);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-title {
+            font-size: 1.125rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .upload-formats {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .format-badge {
+            padding: 0.25rem 0.625rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .preview-section {
+            display: none;
+        }
+
+        .preview-section.active {
+            display: block;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .preview-card {
+            background: var(--bg-white);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .preview-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .preview-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .preview-body {
+            padding: 1rem;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-secondary);
+        }
+
+        .preview-body img, .preview-body svg {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .preview-placeholder {
+            text-align: center;
+            color: var(--text-light);
+        }
+
+        .preview-placeholder span {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .actions-bar {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-primary:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #1DAA54;
+        }
+
+        .btn-success:disabled {
+            background: var(--text-light);
+            cursor: not-allowed;
+        }
+
+        .progress-container {
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .progress-container.active {
+            display: flex;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-secondary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .status-message {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .status-message.success {
+            display: block;
+            background: #ECFDF5;
+            color: #166534;
+        }
+
+        .status-message.error {
+            display: block;
+            background: #FEF2F2;
+            color: #DC2626;
+        }
+
+        .file-info {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .file-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .footer a {
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+
+        @media (max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: static;
+            }
+            .preview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .main-container {
+                padding: 1rem;
+            }
+            .scale-options {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .actions-bar {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🎨</div>
+                <div>
+                    <div class="logo-text">محول SVG</div>
+                    <div class="header-subtitle">تحويل الصور إلى رسومات متجهية</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <aside class="sidebar">
+            <h2 class="sidebar-title">⚙️ إعدادات التحويل</h2>
+
+            <div class="setting-group">
+                <label class="setting-label">نوع التحويل</label>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="conversionType" value="color" checked>
+                        <span>🎨 ملون</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="conversionType" value="bw">
+                        <span>⬛ أبيض وأسود</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="conversionType" value="grayscale">
+                        <span>🌫️ تدرج رمادي</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-group" id="colors-setting">
+                <label class="setting-label">عدد الألوان</label>
+                <div class="range-container">
+                    <input type="range" class="range-slider" id="numColors" min="2" max="64" value="16">
+                    <div class="range-value">
+                        <span>2</span>
+                        <span id="colorsValue">16 لون</span>
+                        <span>64</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">دقة التفاصيل</label>
+                <div class="range-container">
+                    <input type="range" class="range-slider" id="detailLevel" min="1" max="10" value="5">
+                    <div class="range-value">
+                        <span>منخفض</span>
+                        <span id="detailValue">متوسط (5)</span>
+                        <span>عالي</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">مقياس الإخراج</label>
+                <div class="scale-options">
+                    <button class="scale-btn" data-scale="0.5">50%</button>
+                    <button class="scale-btn active" data-scale="1">100%</button>
+                    <button class="scale-btn" data-scale="1.5">150%</button>
+                    <button class="scale-btn" data-scale="2">200%</button>
+                </div>
+            </div>
+
+            <div class="file-info" id="fileInfo">
+                <div class="file-info-row">
+                    <span>📄 الملف:</span>
+                    <span id="fileName">-</span>
+                </div>
+                <div class="file-info-row">
+                    <span>📐 الأبعاد:</span>
+                    <span id="fileDimensions">-</span>
+                </div>
+                <div class="file-info-row">
+                    <span>💾 الحجم:</span>
+                    <span id="fileSize">-</span>
+                </div>
+            </div>
+        </aside>
+
+        <div class="main-content">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div class="upload-title">اسحب الصورة هنا أو اضغط للاختيار</div>
+                <div class="upload-subtitle">اختر صورة لتحويلها إلى SVG</div>
+                <div class="upload-formats">
+                    <span class="format-badge">PNG</span>
+                    <span class="format-badge">JPG</span>
+                    <span class="format-badge">BMP</span>
+                    <span class="format-badge">GIF</span>
+                </div>
+                <input type="file" id="file-input" accept="image/*">
+            </div>
+
+            <div class="preview-section" id="previewSection">
+                <div class="preview-grid">
+                    <div class="preview-card">
+                        <div class="preview-header">
+                            <div class="preview-title">🖼️ الصورة الأصلية</div>
+                        </div>
+                        <div class="preview-body" id="originalPreview">
+                            <div class="preview-placeholder">
+                                <span>🖼️</span>
+                                <p>لم يتم تحميل صورة</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="preview-card">
+                        <div class="preview-header">
+                            <div class="preview-title">✨ معاينة SVG</div>
+                        </div>
+                        <div class="preview-body" id="svgPreview">
+                            <div class="preview-placeholder">
+                                <span>✨</span>
+                                <p>اضغط "تحويل" للمعاينة</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions-bar">
+                    <button class="btn btn-secondary" id="newImageBtn">📂 صورة جديدة</button>
+                    <button class="btn btn-primary" id="convertBtn" disabled>🔄 تحويل إلى SVG</button>
+                    <button class="btn btn-success" id="downloadBtn" disabled>💾 تحميل SVG</button>
+
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">جاري التحويل...</span>
+                    </div>
+                </div>
+
+                <div class="status-message" id="statusMessage"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>تطوير: <strong>عبدالكريم العبود</strong> | <a href="mailto:abo.saleh.g@gmail.com">abo.saleh.g@gmail.com</a></p>
+        <p>© 2024 محول SVG - All Rights Reserved</p>
+    </footer>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('file-input');
+        const previewSection = document.getElementById('previewSection');
+        const originalPreview = document.getElementById('originalPreview');
+        const svgPreview = document.getElementById('svgPreview');
+        const convertBtn = document.getElementById('convertBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const newImageBtn = document.getElementById('newImageBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const statusMessage = document.getElementById('statusMessage');
+        const fileInfo = document.getElementById('fileInfo');
+        const numColorsSlider = document.getElementById('numColors');
+        const colorsValue = document.getElementById('colorsValue');
+        const detailLevelSlider = document.getElementById('detailLevel');
+        const detailValue = document.getElementById('detailValue');
+        const colorsSetting = document.getElementById('colors-setting');
+
+        let currentImage = null;
+        let currentSvg = null;
+        let outputScale = 1;
+
+        // رفع الملفات
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showStatus('يرجى اختيار ملف صورة صالح', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    currentImage = img;
+                    showPreview(img, file);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showPreview(img, file) {
+            uploadArea.style.display = 'none';
+            previewSection.classList.add('active');
+
+            originalPreview.innerHTML = '';
+            const previewImg = document.createElement('img');
+            previewImg.src = img.src;
+            originalPreview.appendChild(previewImg);
+
+            svgPreview.innerHTML = '<div class="preview-placeholder"><span>✨</span><p>اضغط "تحويل" للمعاينة</p></div>';
+
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileDimensions').textContent = `${img.width} × ${img.height}`;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            fileInfo.classList.add('active');
+
+            convertBtn.disabled = false;
+            downloadBtn.disabled = true;
+            currentSvg = null;
+            hideStatus();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' بايت';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' كيلوبايت';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' ميجابايت';
+        }
+
+        numColorsSlider.addEventListener('input', (e) => {
+            colorsValue.textContent = e.target.value + ' لون';
+        });
+
+        detailLevelSlider.addEventListener('input', (e) => {
+            const level = parseInt(e.target.value);
+            const labels = ['', 'منخفض جداً', 'منخفض', 'منخفض', 'متوسط-منخفض', 'متوسط', 'متوسط-عالي', 'عالي', 'عالي', 'عالي جداً', 'أقصى دقة'];
+            detailValue.textContent = `${labels[level]} (${level})`;
+        });
+
+        document.querySelectorAll('input[name="conversionType"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                colorsSetting.style.display = e.target.value === 'bw' ? 'none' : 'block';
+            });
+        });
+
+        document.querySelectorAll('.scale-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.scale-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                outputScale = parseFloat(btn.dataset.scale);
+            });
+        });
+
+        newImageBtn.addEventListener('click', () => {
+            uploadArea.style.display = 'block';
+            previewSection.classList.remove('active');
+            fileInput.value = '';
+            currentImage = null;
+            currentSvg = null;
+            fileInfo.classList.remove('active');
+            hideStatus();
+        });
+
+        convertBtn.addEventListener('click', convertImage);
+        downloadBtn.addEventListener('click', downloadSvg);
+
+        async function convertImage() {
+            if (!currentImage) return;
+
+            convertBtn.disabled = true;
+            progressContainer.classList.add('active');
+            progressFill.style.width = '10%';
+            progressText.textContent = 'جاري تجهيز الصورة...';
+
+            await sleep(50);
+
+            try {
+                const conversionType = document.querySelector('input[name="conversionType"]:checked').value;
+                const numColors = parseInt(numColorsSlider.value);
+                const detailLevel = parseInt(detailLevelSlider.value);
+
+                // إنشاء Canvas
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const width = Math.floor(currentImage.width * outputScale);
+                const height = Math.floor(currentImage.height * outputScale);
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(currentImage, 0, 0, width, height);
+
+                progressFill.style.width = '30%';
+                progressText.textContent = 'جاري معالجة الألوان...';
+                await sleep(50);
+
+                // الحصول على بيانات الصورة
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+
+                // تطبيق الفلاتر
+                if (conversionType === 'bw' || conversionType === 'grayscale') {
+                    for (let i = 0; i < data.length; i += 4) {
+                        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                        if (conversionType === 'bw') {
+                            const val = gray > 128 ? 255 : 0;
+                            data[i] = data[i + 1] = data[i + 2] = val;
+                        } else {
+                            data[i] = data[i + 1] = data[i + 2] = gray;
+                        }
+                    }
+                }
+
+                progressFill.style.width = '50%';
+                progressText.textContent = 'جاري إنشاء SVG...';
+                await sleep(50);
+
+                // إنشاء SVG
+                const svg = createSVG(data, width, height, numColors, detailLevel, conversionType);
+                currentSvg = svg;
+
+                progressFill.style.width = '90%';
+                progressText.textContent = 'جاري عرض المعاينة...';
+                await sleep(50);
+
+                // عرض المعاينة
+                svgPreview.innerHTML = svg;
+                const svgElement = svgPreview.querySelector('svg');
+                if (svgElement) {
+                    svgElement.style.maxWidth = '100%';
+                    svgElement.style.maxHeight = '400px';
+                }
+
+                progressFill.style.width = '100%';
+                progressText.textContent = 'تم!';
+
+                await sleep(300);
+                progressContainer.classList.remove('active');
+                convertBtn.disabled = false;
+                downloadBtn.disabled = false;
+                showStatus('✅ تم التحويل بنجاح!', 'success');
+
+            } catch (error) {
+                console.error('Error:', error);
+                progressContainer.classList.remove('active');
+                convertBtn.disabled = false;
+                showStatus('❌ حدث خطأ: ' + error.message, 'error');
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function createSVG(data, width, height, numColors, detailLevel, conversionType) {
+            const blockSize = Math.max(1, 11 - detailLevel);
+            const colorGroups = {};
+
+            // تجميع البكسلات حسب اللون
+            for (let y = 0; y < height; y += blockSize) {
+                for (let x = 0; x < width; x += blockSize) {
+                    let r = 0, g = 0, b = 0, count = 0;
+
+                    // حساب متوسط الكتلة
+                    for (let dy = 0; dy < blockSize && y + dy < height; dy++) {
+                        for (let dx = 0; dx < blockSize && x + dx < width; dx++) {
+                            const idx = ((y + dy) * width + (x + dx)) * 4;
+                            r += data[idx];
+                            g += data[idx + 1];
+                            b += data[idx + 2];
+                            count++;
+                        }
+                    }
+
+                    r = Math.round(r / count);
+                    g = Math.round(g / count);
+                    b = Math.round(b / count);
+
+                    // تكميم الألوان
+                    if (conversionType !== 'bw') {
+                        const levels = Math.cbrt(numColors);
+                        const step = Math.ceil(256 / levels);
+                        r = Math.min(255, Math.round(r / step) * step);
+                        g = Math.min(255, Math.round(g / step) * step);
+                        b = Math.min(255, Math.round(b / step) * step);
+                    }
+
+                    const color = `rgb(${r},${g},${b})`;
+                    const rectW = Math.min(blockSize, width - x);
+                    const rectH = Math.min(blockSize, height - y);
+
+                    if (!colorGroups[color]) {
+                        colorGroups[color] = [];
+                    }
+                    colorGroups[color].push({ x, y, w: rectW, h: rectH });
+                }
+            }
+
+            // بناء SVG
+            let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <!-- Generated by محول SVG -->
+  <!-- تطوير: عبدالكريم العبود | abo.saleh.g@gmail.com -->
+  <!-- © 2024 محول SVG - All Rights Reserved -->
+`;
+
+            // دمج المستطيلات المتجاورة
+            for (const color in colorGroups) {
+                const rects = colorGroups[color];
+                rects.sort((a, b) => a.y - b.y || a.x - b.x);
+
+                const merged = [];
+                for (const rect of rects) {
+                    const last = merged[merged.length - 1];
+                    if (last && last.y === rect.y && last.h === rect.h && last.x + last.w === rect.x) {
+                        last.w += rect.w;
+                    } else {
+                        merged.push({ ...rect });
+                    }
+                }
+
+                svgContent += `  <g fill="${color}">
+`;
+                for (const rect of merged) {
+                    svgContent += `    <rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}"/>
+`;
+                }
+                svgContent += `  </g>
+`;
+            }
+
+            svgContent += `</svg>`;
+            return svgContent;
+        }
+
+        function downloadSvg() {
+            if (!currentSvg) return;
+
+            const blob = new Blob([currentSvg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'converted.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus('✅ تم تحميل الملف بنجاح!', 'success');
+        }
+
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = 'status-message ' + type;
+        }
+
+        function hideStatus() {
+            statusMessage.className = 'status-message';
+        }
+    </script>
+</body>
+</html>
