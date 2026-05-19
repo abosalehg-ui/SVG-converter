@@ -31,6 +31,7 @@ except ImportError:
 import threading
 
 from svg_core import create_svg
+import potrace_adapter
 
 
 class SVGConverterApp:
@@ -110,6 +111,17 @@ class SVGConverterApp:
             tk.Radiobutton(settings_frame, text=text, variable=self.conversion_type, value=value,
                           bg=self.colors['white'], activebackground=self.colors['white'],
                           font=('Arial', 9)).pack(anchor='w', padx=10)
+
+        # Potrace toggle (only meaningful for BW; greyed if pypotrace missing)
+        self.use_potrace = tk.BooleanVar(value=potrace_adapter.is_available())
+        potrace_label = "✨ استخدام Potrace (منحنيات)" if potrace_adapter.is_available() \
+            else "✨ Potrace غير متوفر (pip install pypotrace)"
+        self.potrace_check = tk.Checkbutton(
+            settings_frame, text=potrace_label, variable=self.use_potrace,
+            bg=self.colors['white'], activebackground=self.colors['white'],
+            font=('Arial', 9), state=tk.NORMAL if potrace_adapter.is_available() else tk.DISABLED
+        )
+        self.potrace_check.pack(anchor='w', padx=10, pady=(5, 0))
         
         # عدد الألوان
         tk.Label(settings_frame, text="عدد الألوان:", font=('Arial', 10),
@@ -281,18 +293,26 @@ class SVGConverterApp:
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
             
             conv_type = self.conversion_type.get()
-            if conv_type == "bw":
-                img = img.convert('L').point(lambda x: 255 if x > 128 else 0, mode='1')
-            elif conv_type == "grayscale":
-                img = img.convert('L')
-            
-            img_rgb = img.convert('RGB')
-            self.output_svg = create_svg(
-                img_rgb,
-                conversion_type=conv_type,
-                num_colors=self.num_colors.get(),
-                detail_level=self.detail_level.get(),
-            )
+
+            if conv_type == "bw" and self.use_potrace.get() and potrace_adapter.is_available():
+                # High-quality Bezier tracing path.
+                self.output_svg = potrace_adapter.trace_bw(img)
+                img_rgb = img.convert('L').point(
+                    lambda x: 255 if x > 128 else 0, mode='1'
+                ).convert('RGB')
+            else:
+                if conv_type == "bw":
+                    img = img.convert('L').point(lambda x: 255 if x > 128 else 0, mode='1')
+                elif conv_type == "grayscale":
+                    img = img.convert('L')
+
+                img_rgb = img.convert('RGB')
+                self.output_svg = create_svg(
+                    img_rgb,
+                    conversion_type=conv_type,
+                    num_colors=self.num_colors.get(),
+                    detail_level=self.detail_level.get(),
+                )
 
             self.root.after(0, lambda: self._conversion_done(img_rgb))
         except Exception as e:
