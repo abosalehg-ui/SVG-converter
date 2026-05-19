@@ -516,6 +516,14 @@
                 </div>
             </div>
 
+            <div class="setting-group" id="potraceSetting" style="display: none;">
+                <label class="radio-option" style="border: 1px solid var(--border-color);">
+                    <input type="checkbox" id="usePotrace">
+                    <span>✨ تتبّع بمنحنيات (Potrace)</span>
+                </label>
+                <div class="range-value" id="potraceStatus" style="margin-top: 0.5rem;"></div>
+            </div>
+
             <div class="setting-group" id="colors-setting">
                 <label class="setting-label">عدد الألوان</label>
                 <div class="range-container">
@@ -630,7 +638,12 @@
         <p>© 2024 محول SVG - All Rights Reserved</p>
     </footer>
 
+    <!-- Optional: drop a Potrace JS library here for high-quality BW tracing.
+         e.g. <script src="vendor/potrace.js"></script>
+         The adapter detects window.Potrace and exposes PotraceAdapter; if absent,
+         the app falls back to the default rectangle-based algorithm. -->
     <script src="svg-core.js"></script>
+    <script src="potrace-adapter.js"></script>
     <script>
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('file-input');
@@ -650,6 +663,18 @@
         const detailLevelSlider = document.getElementById('detailLevel');
         const detailValue = document.getElementById('detailValue');
         const colorsSetting = document.getElementById('colors-setting');
+        const potraceSetting = document.getElementById('potraceSetting');
+        const usePotraceCheckbox = document.getElementById('usePotrace');
+        const potraceStatus = document.getElementById('potraceStatus');
+
+        // Reflect Potrace availability in the sidebar.
+        if (typeof PotraceAdapter !== 'undefined' && PotraceAdapter.isAvailable()) {
+            usePotraceCheckbox.checked = true;
+            potraceStatus.textContent = 'متوفر — جودة أعلى';
+        } else {
+            usePotraceCheckbox.disabled = true;
+            potraceStatus.textContent = 'غير متوفر (أضف vendor/potrace.js)';
+        }
 
         let currentImage = null;
         let currentSvg = null;
@@ -739,7 +764,9 @@
 
         document.querySelectorAll('input[name="conversionType"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
-                colorsSetting.style.display = e.target.value === 'bw' ? 'none' : 'block';
+                const isBw = e.target.value === 'bw';
+                colorsSetting.style.display = isBw ? 'none' : 'block';
+                potraceSetting.style.display = isBw ? 'block' : 'none';
             });
         });
 
@@ -804,8 +831,22 @@
                 progressText.textContent = 'جاري إنشاء SVG...';
                 await sleep(50);
 
-                // إنشاء SVG
-                const svg = SvgCore.createSVG(data, width, height, numColors, detailLevel, conversionType);
+                // High-quality Potrace path for BW mode when available + enabled.
+                let svg;
+                const wantsPotrace = conversionType === 'bw'
+                    && usePotraceCheckbox.checked
+                    && typeof PotraceAdapter !== 'undefined'
+                    && PotraceAdapter.isAvailable();
+                if (wantsPotrace) {
+                    try {
+                        svg = await PotraceAdapter.traceBW(imageData);
+                    } catch (err) {
+                        console.warn('Potrace failed, falling back to default:', err);
+                        svg = SvgCore.createSVG(data, width, height, numColors, detailLevel, conversionType);
+                    }
+                } else {
+                    svg = SvgCore.createSVG(data, width, height, numColors, detailLevel, conversionType);
+                }
                 currentSvg = svg;
 
                 progressFill.style.width = '90%';
