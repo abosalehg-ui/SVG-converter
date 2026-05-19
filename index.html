@@ -23,7 +23,99 @@
             --accent-hover: #C4684A;
             --accent-light: #FDF4F1;
             --success: #22C55E;
+            --status-success-bg: #ECFDF5;
+            --status-success-fg: #166534;
+            --status-error-bg: #FEF2F2;
+            --status-error-fg: #DC2626;
             --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: #1A1915;
+            --bg-secondary: #25241F;
+            --bg-white: #2A2925;
+            --text-primary: #FAF9F7;
+            --text-secondary: #B5B3AD;
+            --text-light: #807E78;
+            --border-color: #3A3935;
+            --accent-primary: #E89270;
+            --accent-hover: #F0A485;
+            --accent-light: #3A2A22;
+            --status-success-bg: #14342A;
+            --status-success-fg: #6EE7B7;
+            --status-error-bg: #3A1F1F;
+            --status-error-fg: #FCA5A5;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Auto-apply dark mode when OS prefers it AND user hasn't picked a theme. */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme]) {
+                --bg-primary: #1A1915;
+                --bg-secondary: #25241F;
+                --bg-white: #2A2925;
+                --text-primary: #FAF9F7;
+                --text-secondary: #B5B3AD;
+                --text-light: #807E78;
+                --border-color: #3A3935;
+                --accent-primary: #E89270;
+                --accent-hover: #F0A485;
+                --accent-light: #3A2A22;
+                --status-success-bg: #14342A;
+                --status-success-fg: #6EE7B7;
+                --status-error-bg: #3A1F1F;
+                --status-error-fg: #FCA5A5;
+                --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        /* Visible focus indicator for keyboard navigation. */
+        :focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        /* Screen-reader-only helper. */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .theme-toggle {
+            margin-inline-start: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .theme-toggle:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .shortcuts-hint {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+        }
+        .shortcuts-hint kbd {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 0.05rem 0.35rem;
+            font-family: inherit;
+            font-size: 0.7rem;
         }
 
         body {
@@ -32,6 +124,7 @@
             color: var(--text-primary);
             min-height: 100vh;
             line-height: 1.6;
+            transition: background-color 0.2s, color 0.2s;
         }
 
         .header {
@@ -410,14 +503,14 @@
 
         .status-message.success {
             display: block;
-            background: #ECFDF5;
-            color: #166534;
+            background: var(--status-success-bg);
+            color: var(--status-success-fg);
         }
 
         .status-message.error {
             display: block;
-            background: #FEF2F2;
-            color: #DC2626;
+            background: var(--status-error-bg);
+            color: var(--status-error-fg);
         }
 
         .file-info {
@@ -482,20 +575,25 @@
     </style>
 </head>
 <body>
+    <a href="#main" class="sr-only">تخطّي إلى المحتوى</a>
     <header class="header">
         <div class="header-content">
             <div class="logo">
-                <div class="logo-icon">🎨</div>
+                <div class="logo-icon" aria-hidden="true">🎨</div>
                 <div>
                     <div class="logo-text">محول SVG</div>
                     <div class="header-subtitle">تحويل الصور إلى رسومات متجهية</div>
                 </div>
             </div>
+            <button id="themeToggle" class="theme-toggle" type="button"
+                    aria-label="تبديل الوضع الداكن" title="تبديل الوضع (Ctrl+D)">
+                <span aria-hidden="true" id="themeIcon">🌙</span>
+            </button>
         </div>
     </header>
 
-    <main class="main-container">
-        <aside class="sidebar">
+    <main class="main-container" id="main">
+        <aside class="sidebar" aria-label="إعدادات التحويل">
             <h2 class="sidebar-title">⚙️ إعدادات التحويل</h2>
 
             <div class="setting-group">
@@ -525,37 +623,48 @@
             </div>
 
             <div class="setting-group" id="colors-setting">
-                <label class="setting-label">عدد الألوان</label>
+                <label class="setting-label" for="numColors">عدد الألوان</label>
                 <div class="range-container">
-                    <input type="range" class="range-slider" id="numColors" min="2" max="64" value="16">
+                    <input type="range" class="range-slider" id="numColors" min="2" max="64" value="16"
+                           aria-valuemin="2" aria-valuemax="64" aria-valuenow="16"
+                           aria-describedby="colorsValue">
                     <div class="range-value">
-                        <span>2</span>
+                        <span aria-hidden="true">2</span>
                         <span id="colorsValue">16 لون</span>
-                        <span>64</span>
+                        <span aria-hidden="true">64</span>
                     </div>
                 </div>
             </div>
 
             <div class="setting-group">
-                <label class="setting-label">دقة التفاصيل</label>
+                <label class="setting-label" for="detailLevel">دقة التفاصيل</label>
                 <div class="range-container">
-                    <input type="range" class="range-slider" id="detailLevel" min="1" max="10" value="5">
+                    <input type="range" class="range-slider" id="detailLevel" min="1" max="10" value="5"
+                           aria-valuemin="1" aria-valuemax="10" aria-valuenow="5"
+                           aria-describedby="detailValue">
                     <div class="range-value">
-                        <span>منخفض</span>
+                        <span aria-hidden="true">منخفض</span>
                         <span id="detailValue">متوسط (5)</span>
-                        <span>عالي</span>
+                        <span aria-hidden="true">عالي</span>
                     </div>
                 </div>
             </div>
 
-            <div class="setting-group">
+            <div class="setting-group" role="radiogroup" aria-label="مقياس الإخراج">
                 <label class="setting-label">مقياس الإخراج</label>
                 <div class="scale-options">
-                    <button class="scale-btn" data-scale="0.5">50%</button>
-                    <button class="scale-btn active" data-scale="1">100%</button>
-                    <button class="scale-btn" data-scale="1.5">150%</button>
-                    <button class="scale-btn" data-scale="2">200%</button>
+                    <button class="scale-btn" data-scale="0.5" role="radio" aria-checked="false">50%</button>
+                    <button class="scale-btn active" data-scale="1" role="radio" aria-checked="true">100%</button>
+                    <button class="scale-btn" data-scale="1.5" role="radio" aria-checked="false">150%</button>
+                    <button class="scale-btn" data-scale="2" role="radio" aria-checked="false">200%</button>
                 </div>
+            </div>
+
+            <div class="shortcuts-hint" aria-label="اختصارات لوحة المفاتيح">
+                ⌨️ اختصارات: <kbd>Ctrl+O</kbd> فتح ·
+                <kbd>Ctrl+Enter</kbd> تحويل ·
+                <kbd>Ctrl+S</kbd> حفظ ·
+                <kbd>Ctrl+D</kbd> الوضع
             </div>
 
             <div class="file-info" id="fileInfo">
@@ -575,17 +684,18 @@
         </aside>
 
         <div class="main-content">
-            <div class="upload-area" id="uploadArea">
-                <div class="upload-icon">📁</div>
+            <div class="upload-area" id="uploadArea" role="button" tabindex="0"
+                 aria-label="رفع صورة (Ctrl+O) - اسحب الصورة هنا أو اضغط للاختيار">
+                <div class="upload-icon" aria-hidden="true">📁</div>
                 <div class="upload-title">اسحب الصورة هنا أو اضغط للاختيار</div>
-                <div class="upload-subtitle">اختر صورة لتحويلها إلى SVG</div>
-                <div class="upload-formats">
+                <div class="upload-subtitle">اختر صورة لتحويلها إلى SVG · <kbd>Ctrl+O</kbd></div>
+                <div class="upload-formats" aria-hidden="true">
                     <span class="format-badge">PNG</span>
                     <span class="format-badge">JPG</span>
                     <span class="format-badge">BMP</span>
                     <span class="format-badge">GIF</span>
                 </div>
-                <input type="file" id="file-input" accept="image/*">
+                <input type="file" id="file-input" accept="image/*" aria-label="اختر ملف صورة">
             </div>
 
             <div class="preview-section" id="previewSection">
@@ -616,11 +726,15 @@
                 </div>
 
                 <div class="actions-bar">
-                    <button class="btn btn-secondary" id="newImageBtn">📂 صورة جديدة</button>
-                    <button class="btn btn-primary" id="convertBtn" disabled>🔄 تحويل إلى SVG</button>
-                    <button class="btn btn-success" id="downloadBtn" disabled>💾 تحميل SVG</button>
+                    <button class="btn btn-secondary" id="newImageBtn" type="button"
+                            aria-label="اختيار صورة جديدة (Ctrl+O)">📂 صورة جديدة</button>
+                    <button class="btn btn-primary" id="convertBtn" type="button" disabled
+                            aria-label="تحويل إلى SVG (Ctrl+Enter)">🔄 تحويل إلى SVG</button>
+                    <button class="btn btn-success" id="downloadBtn" type="button" disabled
+                            aria-label="تحميل ملف SVG (Ctrl+S)">💾 تحميل SVG</button>
 
-                    <div class="progress-container" id="progressContainer">
+                    <div class="progress-container" id="progressContainer"
+                         role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                         <div class="progress-bar">
                             <div class="progress-fill" id="progressFill"></div>
                         </div>
@@ -628,7 +742,7 @@
                     </div>
                 </div>
 
-                <div class="status-message" id="statusMessage"></div>
+                <div class="status-message" id="statusMessage" role="status" aria-live="polite"></div>
             </div>
         </div>
     </main>
@@ -645,6 +759,34 @@
     <script src="svg-core.js"></script>
     <script src="potrace-adapter.js"></script>
     <script>
+        // ===== وضع داكن (يطبَّق قبل أي شيء آخر لتجنّب وميض FOUC) =====
+        (function initTheme() {
+            const stored = localStorage.getItem('svg-converter-theme');
+            if (stored === 'dark' || stored === 'light') {
+                document.documentElement.setAttribute('data-theme', stored);
+            }
+        })();
+        function updateThemeIcon() {
+            const t = document.documentElement.getAttribute('data-theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = t === 'dark' || (!t && prefersDark);
+            document.getElementById('themeIcon').textContent = isDark ? '☀️' : '🌙';
+        }
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isDark = current === 'dark' || (!current && prefersDark);
+            const next = isDark ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('svg-converter-theme', next);
+            updateThemeIcon();
+        }
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateThemeIcon);
+        }
+        updateThemeIcon();
+
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('file-input');
         const previewSection = document.getElementById('previewSection');
@@ -682,6 +824,14 @@
 
         // رفع الملفات
         uploadArea.addEventListener('click', () => fileInput.click());
+
+        // تنشيط منطقة الرفع بلوحة المفاتيح
+        uploadArea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInput.click();
+            }
+        });
         
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -754,12 +904,14 @@
 
         numColorsSlider.addEventListener('input', (e) => {
             colorsValue.textContent = e.target.value + ' لون';
+            e.target.setAttribute('aria-valuenow', e.target.value);
         });
 
         detailLevelSlider.addEventListener('input', (e) => {
             const level = parseInt(e.target.value);
             const labels = ['', 'منخفض جداً', 'منخفض', 'منخفض', 'متوسط-منخفض', 'متوسط', 'متوسط-عالي', 'عالي', 'عالي', 'عالي جداً', 'أقصى دقة'];
             detailValue.textContent = `${labels[level]} (${level})`;
+            e.target.setAttribute('aria-valuenow', level);
         });
 
         document.querySelectorAll('input[name="conversionType"]').forEach(radio => {
@@ -772,8 +924,12 @@
 
         document.querySelectorAll('.scale-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.scale-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.scale-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-checked', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-checked', 'true');
                 outputScale = parseFloat(btn.dataset.scale);
             });
         });
@@ -903,6 +1059,49 @@
         function hideStatus() {
             statusMessage.className = 'status-message';
         }
+
+        // ===== اختصارات لوحة المفاتيح =====
+        document.addEventListener('keydown', (e) => {
+            // تجاهل عندما يكتب المستخدم في حقل نصي
+            const tag = (e.target && e.target.tagName) || '';
+            const isTyping = tag === 'INPUT' && e.target.type !== 'range'
+                || tag === 'TEXTAREA' || e.target.isContentEditable;
+
+            const ctrlOrCmd = e.ctrlKey || e.metaKey;
+            if (!ctrlOrCmd) return;
+
+            // Ctrl+O: فتح
+            if (e.key.toLowerCase() === 'o' && !isTyping) {
+                e.preventDefault();
+                fileInput.click();
+                return;
+            }
+            // Ctrl+Enter: تحويل
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!convertBtn.disabled) convertBtn.click();
+                return;
+            }
+            // Ctrl+S: حفظ
+            if (e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                if (!downloadBtn.disabled) downloadBtn.click();
+                return;
+            }
+            // Ctrl+D: تبديل الوضع
+            if (e.key.toLowerCase() === 'd' && !isTyping) {
+                e.preventDefault();
+                toggleTheme();
+                return;
+            }
+        });
+
+        // تحديث aria-valuenow على progress bar من خلال observer بسيط
+        const progressObserver = new MutationObserver(() => {
+            const w = parseInt(progressFill.style.width) || 0;
+            progressContainer.setAttribute('aria-valuenow', w);
+        });
+        progressObserver.observe(progressFill, { attributes: true, attributeFilter: ['style'] });
     </script>
 </body>
 </html>
