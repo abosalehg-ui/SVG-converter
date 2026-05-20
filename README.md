@@ -10,6 +10,7 @@
 [![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/HTML)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-222222?style=for-the-badge&logo=github)](https://abosalehg-ui.github.io/SVG-converter/)
+[![CI](https://github.com/abosalehg-ui/SVG-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/abosalehg-ui/SVG-converter/actions/workflows/ci.yml)
 
 [🌐 تطبيق الويب](https://abosalehg-ui.github.io/SVG-converter/) · [📝 الإبلاغ عن مشكلة](https://github.com/abosalehg-ui/SVG-converter/issues)
 
@@ -41,6 +42,8 @@
 | 🎛️ **تحكم بالجودة** | عدد الألوان، دقة التفاصيل، مقياس الإخراج |
 | 👁️ **معاينة فورية** | مشاهدة النتيجة قبل الحفظ |
 | 🌐 **واجهة عربية** | دعم كامل للغة العربية |
+| ✒️ **Potrace** | تتبّع مسارات عالي الجودة للوضع الأبيض/الأسود (اختياري) |
+| ✅ **مغطّى بالاختبارات** | اختبارات Python و JavaScript مع CI تلقائي |
 
 ### 🎨 أوضاع التحويل
 
@@ -137,14 +140,41 @@ start index.html
 3. **حوّل**: اضغط "🔄 تحويل إلى SVG"
 4. **حمّل**: اضغط "💾 تحميل SVG" لحفظ الملف
 
+### ⌨️ اختصارات لوحة المفاتيح
+
+| الاختصار | الوظيفة |
+|----------|---------|
+| `Ctrl/⌘ + O` | فتح اختيار ملف |
+| `Ctrl/⌘ + Enter` | تشغيل التحويل |
+| `Ctrl/⌘ + S` | تحميل ملف SVG الناتج |
+| `Ctrl/⌘ + D` | تبديل الوضع الفاتح/الداكن |
+
+### 🌓 الوضع الداكن
+
+زر تبديل في أعلى الصفحة يحفظ تفضيلك في `localStorage` ويحترم إعداد `prefers-color-scheme` للنظام.
+
+### ♿ إمكانية الوصول
+
+- خصائص ARIA كاملة على جميع عناصر التحكم
+- إمكانية التنقل بلوحة المفاتيح بالكامل
+- روابط Skip-to-content
+- علامات `role` و `aria-live` للإشعارات وأشرطة التقدم
+
+### ⚙️ الأداء — Web Worker
+
+التحويل يعمل في **Web Worker** منفصل لتفادي تجميد الواجهة على الصور الكبيرة، مع رجوع تلقائي للخيط الرئيسي عند فتح الملف بـ `file://` أو في المتصفحات القديمة.
+
 ### 🛠️ التقنيات المستخدمة
 
 | التقنية | الاستخدام |
 |---------|-----------|
 | **HTML5** | هيكلة الصفحة |
-| **CSS3** | التصميم والحركات |
-| **JavaScript** | منطق التحويل والتفاعل |
+| **CSS3 (متغيرات)** | التصميم والحركات + ثيم داكن/فاتح |
+| **JavaScript (ES6+)** | منطق التحويل والتفاعل |
+| **Web Worker** | تحويل الصور خارج الخيط الرئيسي |
 | **Canvas API** | معالجة الصور |
+| **svg-core.js** | وحدة مشتركة بين الواجهة والـ Worker والاختبارات |
+| **Potrace.js** | تتبّع المسارات للوضع الأبيض/الأسود (اختياري) |
 
 ---
 
@@ -165,10 +195,46 @@ start index.html
 
 ```
 SVG-converter/
-├── index.html          # 🌐 تطبيق الويب
-├── svg_converter.py    # 🖥️ تطبيق Python
-└── README.md           # 📖 التوثيق
+├── index.html               # 🌐 تطبيق الويب (الواجهة)
+├── svg-core.js              # 🧠 منطق التحويل المشترك (JS)
+├── svg-worker.js            # ⚙️ Web Worker للتحويل خارج الخيط الرئيسي
+├── potrace-adapter.js       # ✒️ غلاف Potrace للوضع الأبيض/الأسود
+├── svg_converter.py         # 🖥️ تطبيق سطح المكتب (Python/Tkinter)
+├── svg_core.py              # 🧠 منطق التحويل المشترك (Python)
+├── potrace_adapter.py       # ✒️ غلاف Potrace (Python)
+├── tests/
+│   ├── test_svg_core.py     # 🧪 اختبارات Python (pytest)
+│   └── svg-core.test.js     # 🧪 اختبارات JavaScript (node --test)
+├── .github/workflows/ci.yml # 🤖 CI: matrix Python 3.9/3.11/3.12 × Node 18/20/22
+├── pyproject.toml           # ⚙️ إعداد pytest
+├── requirements-dev.txt     # 📦 تبعيات التطوير
+└── README.md                # 📖 التوثيق
 ```
+
+---
+
+## 🧪 الاختبارات والتطوير
+
+### تشغيل اختبارات Python
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+### تشغيل اختبارات JavaScript
+
+```bash
+node --test tests/svg-core.test.js
+```
+
+### CI تلقائي
+
+كل push أو pull request يشغّل تلقائياً:
+- **Python**: 3.9 / 3.11 / 3.12
+- **Node.js**: 18.x / 20.x / 22.x
+
+راجع [`.github/workflows/ci.yml`](.github/workflows/ci.yml) للتفاصيل.
 
 ---
 
@@ -179,9 +245,11 @@ SVG-converter/
 | 💻 التشغيل | يحتاج تثبيت Python | يعمل في المتصفح مباشرة |
 | 🌐 الوصول | محلي فقط | من أي جهاز متصل بالإنترنت |
 | 📦 التثبيت | يحتاج مكتبات | لا يحتاج شيء |
-| 🚀 الأداء | أسرع للملفات الكبيرة | مناسب للملفات المتوسطة |
+| 🚀 الأداء | أسرع للملفات الكبيرة | Web Worker يحافظ على استجابة الواجهة |
 | 💾 الحفظ | مباشر للجهاز | تحميل من المتصفح |
 | 🔌 العمل بدون إنترنت | ✅ نعم | ❌ لا (النسخة الأونلاين) |
+| 🌓 وضع داكن | ❌ | ✅ |
+| ⌨️ اختصارات لوحة مفاتيح | ❌ | ✅ |
 
 ---
 
