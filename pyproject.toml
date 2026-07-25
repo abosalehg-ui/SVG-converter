@@ -5,8 +5,21 @@ addopts = "-ra --strict-markers"
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+# Matches the oldest interpreter in the CI matrix. Was "py38" while CI tested
+# 3.9+, which silently held the codebase back from 3.9 syntax.
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 ignore = ["E501"]  # long lines tolerated in error messages
+
+[tool.coverage.run]
+branch = true
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]

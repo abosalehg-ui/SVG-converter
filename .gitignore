@@ -5,3 +5,19 @@ __pycache__/
 .ruff_cache/
 node_modules/
 .DS_Store
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Nothing here needs secrets today, but keep them out by default.
+.env
+.env.*
+*.pem
+*.key
+
+# Python virtualenvs
+.venv/
+venv/

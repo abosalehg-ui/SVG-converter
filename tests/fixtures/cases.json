@@ -1,0 +1,65 @@
+[
+  {
+    "name": "gradient-color-l3-d5",
+    "pattern": "gradient",
+    "width": 16,
+    "height": 12,
+    "conversionType": "color",
+    "colorLevels": 3,
+    "detailLevel": 5
+  },
+  {
+    "name": "gradient-color-l6-d10",
+    "pattern": "gradient",
+    "width": 9,
+    "height": 7,
+    "conversionType": "color",
+    "colorLevels": 6,
+    "detailLevel": 10
+  },
+  {
+    "name": "gradient-color-l2-d1",
+    "pattern": "gradient",
+    "width": 23,
+    "height": 17,
+    "conversionType": "color",
+    "colorLevels": 2,
+    "detailLevel": 1
+  },
+  {
+    "name": "checker-bw-d10",
+    "pattern": "checker",
+    "width": 8,
+    "height": 8,
+    "conversionType": "bw",
+    "colorLevels": 3,
+    "detailLevel": 10
+  },
+  {
+    "name": "checker-bw-d6",
+    "pattern": "checker",
+    "width": 14,
+    "height": 11,
+    "conversionType": "bw",
+    "colorLevels": 3,
+    "detailLevel": 6
+  },
+  {
+    "name": "gray-grayscale-l4-d7",
+    "pattern": "gray",
+    "width": 13,
+    "height": 5,
+    "conversionType": "grayscale",
+    "colorLevels": 4,
+    "detailLevel": 7
+  },
+  {
+    "name": "bands-color-l3-d10",
+    "pattern": "bands",
+    "width": 12,
+    "height": 12,
+    "conversionType": "color",
+    "colorLevels": 3,
+    "detailLevel": 10
+  }
+]

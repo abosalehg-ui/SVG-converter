@@ -1,0 +1,40 @@
+© 2024 عبدالكريم العبود (ABDULKARIM ALOBUD). جميع الحقوق محفوظة.
+Copyright (c) 2024 ABDULKARIM ALOBUD. All Rights Reserved.
+
+هذا المشروع ليس برمجية حرة أو مفتوحة المصدر. الكود منشور للاطلاع فقط.
+
+This project is NOT open source. The source is published for reference only.
+
+يُسمح بما يلي:
+Permitted:
+  • قراءة الكود ودراسته.  / Reading and studying the source.
+  • استخدام التطبيق شخصياً وغير تجارياً.
+    Personal, non-commercial use of the application.
+  • عمل Fork على GitHub بغرض المساهمة عبر Pull Request إلى هذا المستودع.
+    Forking on GitHub for the sole purpose of contributing a pull request
+    back to this repository.
+
+يُمنع بدون إذن كتابي مسبق من صاحب حقوق النشر:
+Prohibited without prior written permission from the copyright holder:
+  • النسخ أو التوزيع أو النشر بأي شكل.
+    Copying, redistribution, or publication in any form.
+  • الاستخدام التجاري.  / Commercial use.
+  • إنشاء أعمال مشتقة.  / Creating derivative works.
+  • إزالة أو تعديل إشعارات حقوق النشر، بما فيها التعليقات المضمّنة في
+    ملفات SVG الناتجة.
+    Removing or altering copyright notices, including the comments embedded
+    in generated SVG files.
+
+المخرجات: ملفات SVG التي ينتجها التطبيق تخصّ مستخدمه؛ لا يدّعي صاحب حقوق
+النشر أي ملكية عليها.
+Output: SVG files produced by the application belong to the user who
+produced them. The copyright holder claims no ownership over them.
+
+يُقدَّم البرنامج "كما هو" دون أي ضمان من أي نوع، صريح أو ضمني. لا يتحمّل
+صاحب حقوق النشر أي مسؤولية عن أي ضرر ناتج عن استخدامه.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+للاستفسار عن التراخيص:  abo.saleh.g@gmail.com
+Licensing enquiries: abo.saleh.g@gmail.com
