@@ -188,15 +188,17 @@
         }
 
         hideStatus();
-        releaseSourceUrl();
-        sourceObjectUrl = URL.createObjectURL(file);
 
+        // Hold the new URL locally and only adopt it once the image decodes.
+        // Revoking the previous one up front would blank a preview that is
+        // still on screen when the new file turns out to be unreadable.
+        const url = URL.createObjectURL(file);
         const img = new Image();
 
         img.onload = () => {
             // Decoding succeeded but the image may still be too big to process.
             if (img.width * img.height > MAX_SOURCE_PIXELS) {
-                releaseSourceUrl();
+                URL.revokeObjectURL(url);
                 showStatus(
                     `❌ الصورة كبيرة جداً (${img.width}×${img.height}). ` +
                     `الحد الأقصى ${Math.round(MAX_SOURCE_PIXELS / 1e6)} ميجابكسل.`,
@@ -204,6 +206,8 @@
                 );
                 return;
             }
+            releaseSourceUrl();
+            sourceObjectUrl = url;
             currentImage = img;
             currentFileName = file.name;
             showPreview(img, file);
@@ -212,12 +216,12 @@
         // Without these the app went silent on a corrupt or mislabelled file:
         // onload never fired and the user just saw a frozen page.
         img.onerror = () => {
-            releaseSourceUrl();
+            URL.revokeObjectURL(url);
             showStatus("❌ تعذّر قراءة هذه الصورة. قد يكون الملف تالفاً أو بصيغة غير مدعومة.", "error");
         };
 
         img.alt = "";
-        img.src = sourceObjectUrl;
+        img.src = url;
     }
 
     function showPreview(img, file) {
