@@ -1,0 +1,12 @@
+# Runtime dependencies for the desktop app (svg_converter.py).
+# The web app (index.html) needs nothing at all.
+
+# Pillow decodes files chosen by the user, so it is the component most exposed
+# to malformed input. 11.3.0 is the first release carrying every fix through
+# CVE-2025-48379; do not relax this floor.
+Pillow>=11.3.0
+
+# Optional extras — install as needed:
+#   numpy       -> ~50x faster conversion (svg_core falls back to pure Python)
+#   pypotrace   -> Bezier-curve tracing for black & white mode
+#   cairosvg    -> renders the real SVG in the preview pane instead of a bitmap

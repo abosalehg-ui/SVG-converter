@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  # Pillow decodes untrusted image files — it is the highest-risk dependency in
+  # the project and must not drift behind security releases.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
+  # Keeps the SHA-pinned actions in .github/workflows current; without this,
+  # pinning would just freeze them on an ageing version.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies, ci]
