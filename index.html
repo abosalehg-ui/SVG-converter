@@ -7,12 +7,14 @@
       Everything happens on the visitor's own machine: no image ever leaves the
       browser. `connect-src 'none'` makes that a guarantee the browser enforces
       rather than a promise in the README. `file:` is listed so the documented
-      "open index.html directly" workflow keeps working.
+      "open index.html directly" workflow keeps working. There are no inline
+      styles: app.js only touches element.style through the CSSOM, which CSP
+      does not restrict, so style-src needs no 'unsafe-inline'.
     -->
     <meta http-equiv="Content-Security-Policy"
           content="default-src 'none';
                    script-src 'self' file:;
-                   style-src 'self' 'unsafe-inline' file:;
+                   style-src 'self' file:;
                    img-src 'self' data: blob: file:;
                    worker-src 'self' file:;
                    connect-src 'none';
@@ -97,8 +99,8 @@
                 </div>
             </div>
 
-            <fieldset class="setting-group">
-                <legend class="setting-label">مقياس الإخراج</legend>
+            <fieldset class="setting-group" aria-describedby="scaleHint">
+                <legend class="setting-label">دقة المعالجة</legend>
                 <div class="scale-options">
                     <label class="scale-btn">
                         <input type="radio" name="outputScale" value="0.5">
@@ -117,6 +119,10 @@
                         <span dir="ltr">200%</span>
                     </label>
                 </div>
+                <p class="setting-hint" id="scaleHint">
+                    تُكبَّر الصورة أو تُصغَّر قبل التقسيم إلى مربعات: القيمة الأعلى تعني
+                    تفاصيل أدق وملفاً أكبر. (ملف SVG يُكبَّر لاحقاً بلا أي فقدان للجودة.)
+                </p>
             </fieldset>
 
             <div class="shortcuts-hint">
@@ -130,7 +136,7 @@
             <div class="file-info" id="fileInfo" hidden>
                 <div class="file-info-row">
                     <span>📄 الملف:</span>
-                    <span id="fileName">-</span>
+                    <bdi id="fileName">-</bdi>
                 </div>
                 <div class="file-info-row">
                     <span>📐 الأبعاد:</span>
@@ -159,9 +165,12 @@
                     <span class="format-badge">GIF</span>
                 </div>
                 <p class="upload-privacy">🔒 المعالجة تتم داخل متصفحك — لا يُرفع أي ملف.</p>
-                <input type="file" id="fileInput" accept="image/*" class="visually-hidden"
-                       aria-label="اختر ملف صورة">
             </div>
+            <!-- Kept outside #uploadArea: an interactive control nested inside a
+                 role="button" is invalid, and its click bubbled back into the
+                 area's own click handler. -->
+            <input type="file" id="fileInput" accept="image/*" class="visually-hidden"
+                   tabindex="-1" aria-hidden="true">
 
             <div class="preview-section" id="previewSection" hidden>
                 <div class="preview-grid">
@@ -193,11 +202,15 @@
 
                 <div class="actions-bar">
                     <button class="btn btn-secondary" id="newImageBtn" type="button"
-                            aria-label="اختيار صورة جديدة (Ctrl+O)">📂 صورة جديدة</button>
+                            aria-label="اختيار صورة جديدة">📂 صورة جديدة</button>
                     <button class="btn btn-primary" id="convertBtn" type="button" disabled
                             aria-label="تحويل إلى SVG (Ctrl+Enter)">🔄 تحويل إلى SVG</button>
                     <button class="btn btn-success" id="downloadBtn" type="button" disabled
                             aria-label="تحميل ملف SVG (Ctrl+S)">💾 تحميل SVG</button>
+
+                    <button class="btn btn-secondary" id="cancelBtn" type="button" hidden>
+                        ✖ إلغاء التحويل
+                    </button>
 
                     <div class="progress-container" id="progressContainer" hidden>
                         <div class="progress-bar" id="progressBar" role="progressbar"

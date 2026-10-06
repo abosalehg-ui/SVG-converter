@@ -310,19 +310,20 @@ body {
     outline: none;
 }
 
+/* 24px thumbs: the old 18px target was hard to hit with a finger. */
 .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     background: var(--accent);
     border-radius: 50%;
     cursor: pointer;
 }
 
 .range-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     background: var(--accent);
     border: 0;
     border-radius: 50%;
@@ -350,7 +351,11 @@ body {
 }
 
 .scale-btn {
-    display: block;
+    /* 44px: the minimum comfortable touch target (WCAG 2.5.5). */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -522,6 +527,16 @@ body {
     color: var(--text-muted);
 }
 
+/* A result produced with settings the user has since changed. */
+.preview-meta.stale {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.preview-body.stale img {
+    opacity: 0.45;
+}
+
 .preview-body {
     padding: 1rem;
     min-height: 300px;
@@ -571,6 +586,10 @@ body {
     gap: 0.5rem;
     border: none;
     font-family: inherit;
+}
+
+.btn[hidden] {
+    display: none;
 }
 
 .btn:disabled {
@@ -659,6 +678,12 @@ body {
     color: var(--status-error-fg);
 }
 
+.status-message.info {
+    display: block;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
 /* --------------------------------------------------------------- footer -- */
 
 .footer {
@@ -681,6 +706,9 @@ body {
     }
     .sidebar {
         position: static;
+        /* Upload and preview first on narrow screens: the settings used to
+           fill the whole first screen, hiding the one thing to do. */
+        order: 2;
     }
     .preview-grid {
         grid-template-columns: 1fr;

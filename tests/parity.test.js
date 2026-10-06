@@ -38,6 +38,9 @@ function pixel(pattern, x, y) {
     if (pattern === "bands") {
         return [(Math.floor(y / 3) * 60) % 256, (Math.floor(x / 4) * 80) % 256, 128];
     }
+    if (pattern === "alpha") {
+        return [(x * 37) % 256, (y * 53) % 256, (x * y * 7) % 256, ((x + y) * 41) % 256];
+    }
     throw new Error("unknown pattern: " + pattern);
 }
 
@@ -45,12 +48,12 @@ function buildImageData(pattern, width, height) {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const [r, g, b] = pixel(pattern, x, y);
+            const [r, g, b, a = 255] = pixel(pattern, x, y);
             const idx = (y * width + x) * 4;
             data[idx] = r;
             data[idx + 1] = g;
             data[idx + 2] = b;
-            data[idx + 3] = 255;
+            data[idx + 3] = a;
         }
     }
     return data;
@@ -86,6 +89,15 @@ for (const testCase of CASES) {
 test("fixtures cover every conversion type", () => {
     const covered = new Set(CASES.map((c) => c.conversionType));
     assert.deepEqual([...covered].sort(), [...SvgCore.VALID_CONVERSION_TYPES].sort());
+});
+
+test("fixtures feed colour and transparent pixels to every filtered mode", () => {
+    // Pre-filtered input would let the two ports disagree on step 0 unnoticed.
+    const rich = new Set(["gradient", "alpha"]);
+    for (const mode of ["bw", "grayscale"]) {
+        assert.ok(CASES.some((c) => c.conversionType === mode && rich.has(c.pattern)), mode);
+    }
+    assert.ok(CASES.some((c) => c.pattern === "alpha"));
 });
 
 test("fixtures cover the color level range", () => {

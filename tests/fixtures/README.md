@@ -28,11 +28,18 @@ integer-safe range so there is nothing to round differently:
 | `checker` | `v = 255 if (x + y) % 2 == 0 else 0`, `r = g = b = v`                        |
 | `gray`    | `v = (x*29 + y*13) % 256`, `r = g = b = v`                                   |
 | `bands`   | `v = (y // 3) * 60 % 256`, `r = v`, `g = (x // 4) * 80 % 256`, `b = 128`     |
+| `alpha`   | `r = (x*37) % 256`, `g = (y*53) % 256`, `b = (x*y*7) % 256`, **`a = ((x + y)*41) % 256`** |
 
-The `bw` and `grayscale` cases feed pixels that are *already* filtered, so the
-fixtures test the shared core only — `applyGrayscaleFilter` (JS) and PIL's
-`convert("L")` (Python) are separate pre-processing steps covered by their own
-unit tests.
+`alpha` is the only RGBA pattern; it covers fully transparent, partly
+transparent and opaque pixels.
+
+Step 0 of the algorithm — compositing transparency onto white and the integer
+luma filter for `bw` / `grayscale` — lives inside both cores, so the fixtures
+cover it too: there are `bw` and `grayscale` cases fed with colour (`gradient`)
+and transparent (`alpha`) pixels, and a test in each suite fails if those cases
+are ever removed. What the fixtures do **not** cover is resizing: at a
+processing scale other than 100% the browser's canvas and Pillow's LANCZOS
+resample differently, so the two apps can differ there.
 
 ## Regenerating
 
@@ -42,5 +49,5 @@ Only when the algorithm changes **on purpose**:
 python tests/fixtures/generate_golden.py
 ```
 
-Then run both suites. If `node --test tests/` still passes, the two ports agree.
+Then run both suites. If `node --test tests/parity.test.js` still passes, the two ports agree.
 If it fails, the JavaScript port has not been updated to match.

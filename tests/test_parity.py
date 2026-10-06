@@ -56,6 +56,15 @@ def test_fixtures_cover_every_conversion_type():
     assert covered == set(svg_core.VALID_CONVERSION_TYPES)
 
 
+def test_fixtures_feed_colour_and_transparent_pixels_to_filtered_modes():
+    # Pre-filtered input would let the two ports disagree on step 0 unnoticed.
+    for mode in ("bw", "grayscale"):
+        assert any(
+            c["conversionType"] == mode and c["pattern"] in ("gradient", "alpha") for c in CASES
+        ), mode
+    assert any(c["pattern"] == "alpha" for c in CASES)
+
+
 def test_fixtures_cover_the_color_level_range():
     levels = {case["colorLevels"] for case in CASES}
     assert svg_core.MIN_COLOR_LEVELS in levels

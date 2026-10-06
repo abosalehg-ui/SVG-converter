@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from svg_core import BW_THRESHOLD, DEFAULT_HEADER_COMMENTS
+from svg_core import BW_THRESHOLD, DEFAULT_HEADER_COMMENTS, prepare_image
 
 try:
     import numpy as np
@@ -57,7 +57,9 @@ def trace_bw(
     """Trace a (PIL) image as black-on-white via Potrace and return SVG.
 
     Args:
-        img: A PIL ``Image`` instance. Will be converted to grayscale internally.
+        img: A PIL ``Image`` instance. Transparency is composited onto white
+            and the luma filter applied exactly as :func:`svg_core.create_svg`
+            does, so both renderers see the same black and white.
         threshold: Pixels with grayscale >= ``threshold`` are treated as white.
         turdsize: Suppress speckles smaller than this many pixels.
         alphamax: Curve smoothness (0=polygons, ~1.34=very smooth).
@@ -73,7 +75,7 @@ def trace_bw(
     if not _AVAILABLE:
         raise RuntimeError("pypotrace not available; install with: pip install pypotrace")
 
-    gray = img.convert("L")
+    gray = prepare_image(img, "bw")
     width, height = gray.size
 
     arr = np.asarray(gray, dtype=np.uint8)

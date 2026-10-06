@@ -99,6 +99,27 @@ jobs:
       - name: Run node:test suite
         run: node --test tests/svg-core.test.js tests/parity.test.js
 
+  e2e:
+    name: Web app end-to-end (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      - name: Install Playwright
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      # app.js had no tests at all, which is how a race that saved one image's
+      # result under another image's name went unnoticed.
+      - name: Run end-to-end tests
+        run: npm run test:e2e
+
   parity:
     name: Cross-language parity
     runs-on: ubuntu-latest
