@@ -6,7 +6,7 @@ Run this ONLY when the conversion algorithm changes on purpose:
     python tests/fixtures/generate_golden.py
 
 Then run both suites. ``pytest`` passing proves Python matches the new goldens;
-``node --test tests/`` passing proves the JavaScript port was updated to match.
+``node --test tests/parity.test.js`` passing proves the JavaScript port matches.
 A failure in only one of them is the drift signal these fixtures exist for.
 """
 

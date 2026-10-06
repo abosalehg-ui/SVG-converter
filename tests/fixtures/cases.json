@@ -61,5 +61,50 @@
     "conversionType": "color",
     "colorLevels": 3,
     "detailLevel": 10
+  },
+  {
+    "name": "gradient-bw-d10",
+    "pattern": "gradient",
+    "width": 11,
+    "height": 9,
+    "conversionType": "bw",
+    "colorLevels": 3,
+    "detailLevel": 10
+  },
+  {
+    "name": "gradient-grayscale-l6-d9",
+    "pattern": "gradient",
+    "width": 19,
+    "height": 13,
+    "conversionType": "grayscale",
+    "colorLevels": 6,
+    "detailLevel": 9
+  },
+  {
+    "name": "alpha-color-l4-d10",
+    "pattern": "alpha",
+    "width": 10,
+    "height": 8,
+    "conversionType": "color",
+    "colorLevels": 4,
+    "detailLevel": 10
+  },
+  {
+    "name": "alpha-bw-d10",
+    "pattern": "alpha",
+    "width": 13,
+    "height": 11,
+    "conversionType": "bw",
+    "colorLevels": 3,
+    "detailLevel": 10
+  },
+  {
+    "name": "alpha-grayscale-l5-d10",
+    "pattern": "alpha",
+    "width": 9,
+    "height": 9,
+    "conversionType": "grayscale",
+    "colorLevels": 5,
+    "detailLevel": 10
   }
 ]

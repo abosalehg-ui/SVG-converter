@@ -1,0 +1,13 @@
+{
+  "name": "svg-converter",
+  "private": true,
+  "description": "Dev tooling only: the web app itself has no dependencies and no build step.",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "test": "node --test tests/svg-core.test.js tests/parity.test.js",
+    "test:e2e": "node --test tests/e2e/app.e2e.test.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

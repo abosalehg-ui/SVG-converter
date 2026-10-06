@@ -10,6 +10,14 @@ updates:
     open-pull-requests-limit: 5
     labels: [dependencies]
 
+  # Playwright, used only by the end-to-end tests (the app has no npm deps).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+
   # Keeps the SHA-pinned actions in .github/workflows current; without this,
   # pinning would just freeze them on an ageing version.
   - package-ecosystem: github-actions

@@ -31,7 +31,7 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageTk, UnidentifiedImageError
 except ImportError:
     print("خطأ: مكتبة Pillow غير مثبتة!")
     print("قم بتثبيتها باستخدام: pip install Pillow")
@@ -51,11 +51,16 @@ from svg_core import (
     BW_THRESHOLD,
     DEFAULT_COLOR_LEVELS,
     DEFAULT_DETAIL_LEVEL,
+    MAX_BLOCKS,
     MAX_COLOR_LEVELS,
     MAX_DETAIL_LEVEL,
     MIN_COLOR_LEVELS,
     MIN_DETAIL_LEVEL,
+    OutputTooComplexError,
+    block_count,
     create_svg,
+    prepare_image,
+    preview_image,
 )
 
 SUPPORTED_EXTENSIONS = "*.png *.jpg *.jpeg *.bmp *.gif *.webp"
@@ -63,6 +68,19 @@ SUPPORTED_EXTENSIONS = "*.png *.jpg *.jpeg *.bmp *.gif *.webp"
 #: Refuse images larger than this instead of letting Pillow expand a small
 #: crafted file into gigabytes of RAM (decompression bomb).
 MAX_IMAGE_PIXELS = 64_000_000  # 64 megapixels, e.g. 8000x8000
+
+#: Limits on the image actually converted (after the processing scale). Same
+#: values as the web app: a 64MP source at 200% used to be resized to 256MP —
+#: over 768 MB — before conversion even started.
+MAX_OUTPUT_PIXELS = 40_000_000
+MAX_OUTPUT_DIMENSION = 16384
+
+TOO_COMPLEX_MESSAGE = "هذه الإعدادات تنتج ملفاً معقّداً جداً. خفّض دقة التفاصيل أو دقة المعالجة."
+
+
+class ConversionLimitError(ValueError):
+    """A conversion refused up front; the message is Arabic and user-facing."""
+
 
 #: Arabic-capable families, best first. Tk silently falls back to a default
 #: font for any name it does not know, so ordering here is what matters.
@@ -92,6 +110,50 @@ class ConversionSettings:
     use_potrace: bool
 
 
+@dataclass(frozen=True)
+class RenderResult:
+    """What a conversion hands back to the UI thread."""
+
+    svg: str
+    preview: Image.Image
+    #: False when the preview is only an approximation of the SVG (Potrace
+    #: mode without cairosvg); the pane title says so.
+    exact_preview: bool
+
+
+def _binarize(img):
+    """Pure black/white bitmap, matching what ``"bw"`` mode traces."""
+    return prepare_image(img, "bw").point(lambda v: 255 if v >= BW_THRESHOLD else 0, mode="1")
+
+
+def describe_load_error(exc: Exception) -> str:
+    """Arabic, user-facing text for a failure to open an image.
+
+    Pillow's own messages ("cannot identify image file ...") are English and
+    technical; they still go to stderr for debugging.
+    """
+    if isinstance(exc, (Image.DecompressionBombError, Image.DecompressionBombWarning)):
+        return "أبعاد الصورة ضخمة بشكل غير طبيعي، ورُفض فتحها حمايةً للذاكرة."
+    if isinstance(exc, UnidentifiedImageError):
+        return "تعذّر التعرّف على الصورة. قد يكون الملف تالفاً أو بصيغة غير مدعومة."
+    if isinstance(exc, ValueError):
+        return str(exc)  # our own size check, already in Arabic
+    if isinstance(exc, OSError):
+        return "تعذّر قراءة الملف. تأكد أنه موجود وأن لديك صلاحية فتحه."
+    return "تعذّر فتح الصورة."
+
+
+def describe_conversion_error(exc: Exception) -> str:
+    """Arabic, user-facing text for a failed conversion."""
+    if isinstance(exc, ConversionLimitError):
+        return str(exc)
+    if isinstance(exc, OutputTooComplexError):
+        return TOO_COMPLEX_MESSAGE
+    if isinstance(exc, MemoryError):
+        return "نفدت الذاكرة أثناء التحويل. جرّب دقة معالجة أو دقة تفاصيل أقل."
+    return "تعذّر إكمال التحويل. جرّب صورة أصغر أو إعدادات أقل."
+
+
 def _pick_font_family(root: tk.Misc) -> str:
     """Return the first installed family that can render Arabic."""
     try:
@@ -117,6 +179,11 @@ class SVGConverterApp:
         self.current_image_path = None
         self.current_image = None
         self.output_svg = None
+        # Bumped on every conversion and every newly loaded image; a worker
+        # whose id is no longer current has its result discarded, so a slow
+        # conversion can never land on top of a different image.
+        self._job_id = 0
+        self._converting = False
 
         self.colors = {
             "bg": "#FAF9F7",
@@ -274,8 +341,8 @@ class SVGConverterApp:
             length=190,
         ).pack(anchor="e")
 
-        # مقياس الإخراج
-        label("مقياس الإخراج:", pady=(15, 5))
+        # دقة المعالجة: scales the bitmap BEFORE it is split into blocks.
+        label("دقة المعالجة:", pady=(15, 5))
         self.output_scale = tk.DoubleVar(value=1.0)
         scale_frame = tk.Frame(panel, bg=self.colors["white"])
         scale_frame.pack(anchor="e")
@@ -289,6 +356,15 @@ class SVGConverterApp:
                 activebackground=self.colors["white"],
                 font=self._font(9),
             ).pack(side=tk.RIGHT)
+        tk.Label(
+            panel,
+            text="الأعلى = تفاصيل أدق وملف أكبر",
+            font=self._font(8),
+            bg=self.colors["white"],
+            fg=self.colors["text_light"],
+            anchor="e",
+            justify="right",
+        ).pack(anchor="e", fill=tk.X)
 
         self.file_info = tk.Label(
             panel,
@@ -334,11 +410,11 @@ class SVGConverterApp:
         svg_frame = tk.Frame(previews, bg=self.colors["white"])
         svg_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
-        # Honest labelling: without cairosvg this pane shows the filtered
-        # bitmap, which is an approximation of the SVG, not the SVG itself.
+        # Retitled per result: only Potrace mode without cairosvg falls back
+        # to an approximate preview, and then the title says so.
         self.svg_preview_title = tk.Label(
             svg_frame,
-            text=("✨ معاينة SVG" if _HAS_CAIROSVG else "✨ معاينة تقريبية (بدون cairosvg)"),
+            text="✨ معاينة SVG",
             font=self._font(10, "bold"),
             bg=self.colors["white"],
         )
@@ -371,7 +447,7 @@ class SVGConverterApp:
         )
         self.convert_btn.pack(side=tk.RIGHT, padx=10)
 
-        tk.Button(
+        self.select_btn = tk.Button(
             buttons_frame,
             text="📂 اختيار صورة",
             font=self._font(10),
@@ -381,7 +457,8 @@ class SVGConverterApp:
             padx=15,
             pady=8,
             command=self.select_image,
-        ).pack(side=tk.RIGHT)
+        )
+        self.select_btn.pack(side=tk.RIGHT)
 
         self.save_btn = tk.Button(
             buttons_frame,
@@ -440,6 +517,8 @@ class SVGConverterApp:
             self.potrace_check.pack_forget()
 
     def select_image(self):
+        if self._converting:
+            return
         filepath = filedialog.askopenfilename(
             title="اختر صورة",
             filetypes=[("ملفات الصور", SUPPORTED_EXTENSIONS), ("جميع الملفات", "*.*")],
@@ -451,9 +530,11 @@ class SVGConverterApp:
         try:
             image = self._open_image_safely(filepath)
         except Exception as exc:
-            messagebox.showerror("خطأ", f"فشل تحميل الصورة:\n{exc}")
+            print(f"load_image: {exc!r}", file=sys.stderr)
+            messagebox.showerror("خطأ", f"فشل تحميل الصورة:\n{describe_load_error(exc)}")
             return
 
+        self._job_id += 1
         self.current_image_path = filepath
         self.current_image = image
 
@@ -496,14 +577,16 @@ class SVGConverterApp:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             image = Image.open(filepath)
+            # The header already gives the size, so check it BEFORE decoding:
+            # checking after load() meant the whole bitmap was already in RAM.
+            if image.width * image.height > MAX_IMAGE_PIXELS:
+                size = f"{image.width}×{image.height}"
+                image.close()
+                raise ValueError(
+                    f"الصورة كبيرة جداً ({size}). "
+                    f"الحد الأقصى {MAX_IMAGE_PIXELS // 1_000_000} ميجابكسل."
+                )
             image.load()
-
-        pixels = image.width * image.height
-        if pixels > MAX_IMAGE_PIXELS:
-            raise ValueError(
-                f"الصورة كبيرة جداً ({image.width}×{image.height}). "
-                f"الحد الأقصى {MAX_IMAGE_PIXELS // 1_000_000} ميجابكسل."
-            )
         return image
 
     def display_image(self, img, canvas):
@@ -540,36 +623,59 @@ class SVGConverterApp:
             use_potrace=self.use_potrace.get(),
         )
         source = self.current_image.copy()
+        self._job_id += 1
+        job_id = self._job_id
+        self._converting = True
 
         self.convert_btn.config(state=tk.DISABLED)
         self.save_btn.config(state=tk.DISABLED)
+        self.select_btn.config(state=tk.DISABLED)
         self.status_label.config(text="⏳ جاري التحويل...")
         self.progress.pack(pady=(10, 0))
         self.progress.start(12)
 
         # daemon=True so closing the window during a long conversion actually exits.
-        threading.Thread(target=self._do_convert, args=(source, settings), daemon=True).start()
+        threading.Thread(
+            target=self._do_convert, args=(source, settings, job_id), daemon=True
+        ).start()
 
-    def _do_convert(self, img, settings: ConversionSettings):
+    def _do_convert(self, img, settings: ConversionSettings, job_id: int):
         try:
-            svg, preview = self._render(img, settings)
+            result = self._render(img, settings)
         except Exception as exc:
+            print(f"convert: {exc!r}", file=sys.stderr)
             # Bind the message NOW: `exc` is unbound by the time a deferred
             # callback runs, which used to turn every failure into a NameError.
-            message = str(exc)
-            self.root.after(0, lambda: self._conversion_error(message))
+            message = describe_conversion_error(exc)
+            self.root.after(0, lambda: self._conversion_error(message, job_id))
             return
 
-        self.root.after(0, lambda: self._conversion_done(svg, preview))
+        self.root.after(0, lambda: self._conversion_done(result, job_id))
 
     @staticmethod
-    def _render(img, settings: ConversionSettings):
-        """Produce (svg_string, preview_image). Runs off the main thread."""
-        if settings.output_scale != 1.0:
-            new_size = (
-                max(1, int(img.width * settings.output_scale)),
-                max(1, int(img.height * settings.output_scale)),
+    def _output_size(img, settings: ConversionSettings) -> tuple[int, int]:
+        """Size of the bitmap that will actually be converted, checked against limits."""
+        width = max(1, int(img.width * settings.output_scale))
+        height = max(1, int(img.height * settings.output_scale))
+        if (
+            width > MAX_OUTPUT_DIMENSION
+            or height > MAX_OUTPUT_DIMENSION
+            or width * height > MAX_OUTPUT_PIXELS
+        ):
+            raise ConversionLimitError(
+                f"الناتج المطلوب كبير جداً ({width}×{height}). اختر دقة معالجة أقل."
             )
+        uses_blocks = not (settings.conversion_type == "bw" and settings.use_potrace)
+        if uses_blocks and block_count(width, height, settings.detail_level) > MAX_BLOCKS:
+            raise ConversionLimitError(TOO_COMPLEX_MESSAGE)
+        return width, height
+
+    @staticmethod
+    def _render(img, settings: ConversionSettings) -> RenderResult:
+        """Convert and build the preview. Runs off the main thread."""
+        # Checked before resizing, so an oversized request costs nothing.
+        new_size = SVGConverterApp._output_size(img, settings)
+        if new_size != img.size:
             img = img.resize(new_size, Image.Resampling.LANCZOS)
 
         conversion_type = settings.conversion_type
@@ -579,53 +685,66 @@ class SVGConverterApp:
 
         if use_potrace:
             svg = potrace_adapter.trace_bw(img, threshold=BW_THRESHOLD)
-            # Fallback preview mirrors what Potrace traced, not the source image.
-            img = img.convert("L").point(lambda v: 255 if v >= BW_THRESHOLD else 0, mode="1")
-        else:
-            if conversion_type == "bw":
-                img = img.convert("L").point(lambda v: 255 if v >= BW_THRESHOLD else 0, mode="1")
-            elif conversion_type == "grayscale":
-                img = img.convert("L")
+            preview, exact = SVGConverterApp._svg_preview(svg, _binarize(img))
+            return RenderResult(svg, preview, exact)
 
-            svg = create_svg(
-                img.convert("RGB"),
-                conversion_type=conversion_type,
-                color_levels=settings.color_levels,
-                detail_level=settings.detail_level,
-            )
-
-        return svg, SVGConverterApp._svg_preview(svg, img)
+        # create_svg flattens transparency and applies the luma filter itself,
+        # so it gets the image untouched.
+        svg = create_svg(
+            img,
+            conversion_type=conversion_type,
+            color_levels=settings.color_levels,
+            detail_level=settings.detail_level,
+        )
+        # Painted from the same blocks as the SVG: exact, no cairosvg needed.
+        preview = preview_image(
+            img,
+            conversion_type=conversion_type,
+            color_levels=settings.color_levels,
+            detail_level=settings.detail_level,
+        )
+        return RenderResult(svg, preview, True)
 
     @staticmethod
     def _svg_preview(svg: str, fallback_img):
-        """Rasterize the SVG so the preview shows the real output.
+        """Rasterize a Potrace SVG; returns ``(image, is_exact)``.
 
-        Falls back to the filtered bitmap when cairosvg is unavailable; the
-        pane title says so, rather than passing an approximation off as the
-        actual result.
+        Falls back to the binarized bitmap when cairosvg is unavailable; the
+        pane title then says the preview is approximate, rather than passing
+        an approximation off as the actual result.
         """
         if not _HAS_CAIROSVG:
-            return fallback_img.convert("RGB")
+            return fallback_img.convert("RGB"), False
         try:
             png = cairosvg.svg2png(bytestring=svg.encode("utf-8"))
-            return Image.open(io.BytesIO(png)).convert("RGB")
+            return Image.open(io.BytesIO(png)).convert("RGB"), True
         except Exception:  # pragma: no cover - depends on the Cairo build
-            return fallback_img.convert("RGB")
+            return fallback_img.convert("RGB"), False
 
-    def _conversion_done(self, svg, preview):
-        self.output_svg = svg
+    def _finish_job(self):
+        self._converting = False
         self.progress.stop()
         self.progress.pack_forget()
-        self.display_image(preview, self.svg_canvas)
         self.convert_btn.config(state=tk.NORMAL)
+        self.select_btn.config(state=tk.NORMAL)
+
+    def _conversion_done(self, result: RenderResult, job_id: int):
+        if job_id != self._job_id:
+            return  # superseded: belongs to an image that is no longer shown
+        self._finish_job()
+        self.output_svg = result.svg
+        self.svg_preview_title.config(
+            text="✨ معاينة SVG" if result.exact_preview else "✨ معاينة تقريبية (بدون cairosvg)"
+        )
+        self.display_image(result.preview, self.svg_canvas)
         self.save_btn.config(state=tk.NORMAL)
-        size_kb = len(svg.encode("utf-8")) / 1024
+        size_kb = len(result.svg.encode("utf-8")) / 1024
         self.status_label.config(text=f"✅ تم التحويل بنجاح! ({size_kb:.1f} KB)")
 
-    def _conversion_error(self, message: str):
-        self.progress.stop()
-        self.progress.pack_forget()
-        self.convert_btn.config(state=tk.NORMAL)
+    def _conversion_error(self, message: str, job_id: int):
+        if job_id != self._job_id:
+            return
+        self._finish_job()
         self.status_label.config(text="❌ فشل التحويل")
         messagebox.showerror("خطأ", f"فشل التحويل:\n{message}")
 

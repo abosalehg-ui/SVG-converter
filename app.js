@@ -22,6 +22,16 @@
     const MAX_OUTPUT_PIXELS = 40e6;
     const MAX_OUTPUT_DIMENSION = 16384;
 
+    /**
+     * Output size follows the number of blocks, not the pixel count, so the
+     * pixel limits above cannot stop a 12MP photo at full detail from building
+     * a string bigger than V8 allows. svg-core enforces MAX_BLOCKS; this is the
+     * message users see when they hit it.
+     */
+    const TOO_COMPLEX_MESSAGE =
+        "❌ هذه الإعدادات تنتج ملفاً معقّداً جداً قد يوقف المتصفح. " +
+        "خفّض دقة التفاصيل أو دقة المعالجة.";
+
     /** How long to wait for the worker to answer a readiness ping. */
     const WORKER_PING_TIMEOUT_MS = 3000;
 
@@ -41,6 +51,7 @@
     const convertBtn = $("convertBtn");
     const downloadBtn = $("downloadBtn");
     const newImageBtn = $("newImageBtn");
+    const cancelBtn = $("cancelBtn");
     const progressContainer = $("progressContainer");
     const progressBar = $("progressBar");
     const progressFill = $("progressFill");
@@ -58,6 +69,8 @@
     let currentImage = null;
     let currentFileName = null;
     let currentSvg = null;
+    let currentSvgSize = 0;
+    let currentSvgSettingsKey = null;
     let sourceObjectUrl = null;
     let previewObjectUrl = null;
 
@@ -111,8 +124,11 @@
         if (error && error.userMessage) {
             return error.userMessage;
         }
+        if (error && error.code === "TOO_COMPLEX") {
+            return TOO_COMPLEX_MESSAGE;
+        }
         console.error("SVG converter:", error);
-        return "تعذّر إكمال التحويل. جرّب صورة أصغر أو مقياس إخراج أقل.";
+        return "تعذّر إكمال التحويل. جرّب صورة أصغر أو دقة معالجة أقل.";
     }
 
     function showStatus(message, type) {
@@ -182,6 +198,17 @@
     });
 
     function handleFile(file) {
+        // Swapping the image mid-conversion is how a result for one picture
+        // used to end up saved under another picture's name.
+        if (activeConversion) return;
+
+        if (file.type === "image/svg+xml") {
+            showStatus(
+                "❌ هذا الملف بصيغة SVG أصلاً. اختر صورة نقطية (PNG، JPG، WebP، BMP، GIF).",
+                "error"
+            );
+            return;
+        }
         if (!file.type.startsWith("image/")) {
             showStatus("❌ يرجى اختيار ملف صورة صالح (PNG، JPG، WebP، BMP، GIF)", "error");
             return;
@@ -196,11 +223,16 @@
         const img = new Image();
 
         img.onload = () => {
+            if (!img.naturalWidth || !img.naturalHeight) {
+                URL.revokeObjectURL(url);
+                showStatus("❌ تعذّر تحديد أبعاد هذه الصورة.", "error");
+                return;
+            }
             // Decoding succeeded but the image may still be too big to process.
-            if (img.width * img.height > MAX_SOURCE_PIXELS) {
+            if (img.naturalWidth * img.naturalHeight > MAX_SOURCE_PIXELS) {
                 URL.revokeObjectURL(url);
                 showStatus(
-                    `❌ الصورة كبيرة جداً (${img.width}×${img.height}). ` +
+                    `❌ الصورة كبيرة جداً (${img.naturalWidth}×${img.naturalHeight}). ` +
                     `الحد الأقصى ${Math.round(MAX_SOURCE_PIXELS / 1e6)} ميجابكسل.`,
                     "error"
                 );
@@ -234,21 +266,25 @@
         previewImg.alt = "معاينة الصورة الأصلية: " + file.name;
         originalPreview.replaceChildren(previewImg);
 
-        resetSvgPreview();
+        clearResult();
 
         $("fileName").textContent = file.name;
-        $("fileDimensions").textContent = `${img.width} × ${img.height}`;
+        $("fileDimensions").textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
         $("fileSize").textContent = formatFileSize(file.size);
         fileInfo.hidden = false;
 
         convertBtn.disabled = false;
-        downloadBtn.disabled = true;
-        currentSvg = null;
     }
 
-    function resetSvgPreview() {
+    /** Forget the converted result and put the placeholder back. */
+    function clearResult() {
+        currentSvg = null;
+        currentSvgSize = 0;
+        currentSvgSettingsKey = null;
+        downloadBtn.disabled = true;
         releasePreviewUrl();
         svgMeta.textContent = "";
+        svgPreview.classList.remove("stale");
         const placeholder = document.createElement("div");
         placeholder.className = "preview-placeholder";
         const icon = document.createElement("span");
@@ -263,16 +299,16 @@
     newImageBtn.addEventListener("click", resetToUpload);
 
     function resetToUpload() {
+        if (activeConversion) return;
         uploadArea.hidden = false;
         previewSection.hidden = true;
         fileInput.value = "";
         currentImage = null;
         currentFileName = null;
-        currentSvg = null;
         fileInfo.hidden = true;
         // Drop the big bitmaps instead of leaving them parked in the DOM.
         originalPreview.replaceChildren();
-        resetSvgPreview();
+        clearResult();
         releaseSourceUrl();
         hideStatus();
         uploadArea.focus();
@@ -307,13 +343,40 @@
         });
     });
 
-    function selectedConversionType() {
-        return document.querySelector('input[name="conversionType"]:checked').value;
+    function readSettings() {
+        return {
+            conversionType: document.querySelector('input[name="conversionType"]:checked').value,
+            colorLevels: Number(colorLevelsSlider.value),
+            detailLevel: Number(detailLevelSlider.value),
+            outputScale: parseFloat(
+                document.querySelector('input[name="outputScale"]:checked').value
+            ),
+        };
     }
 
-    function selectedOutputScale() {
-        return parseFloat(document.querySelector('input[name="outputScale"]:checked').value);
+    function settingsKey(settings) {
+        // Colour levels are ignored in BW mode, so they must not mark it stale.
+        const levels = settings.conversionType === "bw" ? 0 : settings.colorLevels;
+        return [settings.conversionType, levels, settings.detailLevel, settings.outputScale].join("|");
     }
+
+    /**
+     * A preview left over from other settings used to look exactly like a
+     * fresh one, so users downloaded a result they had already changed.
+     */
+    function refreshStaleState() {
+        if (!currentSvg) return;
+        const stale = settingsKey(readSettings()) !== currentSvgSettingsKey;
+        svgPreview.classList.toggle("stale", stale);
+        svgMeta.textContent = stale
+            ? formatFileSize(currentSvgSize) + " · الإعدادات تغيّرت، أعد التحويل"
+            : formatFileSize(currentSvgSize);
+        svgMeta.classList.toggle("stale", stale);
+        if (stale) hideStatus();
+    }
+
+    document.querySelector(".sidebar").addEventListener("input", refreshStaleState);
+    document.querySelector(".sidebar").addEventListener("change", refreshStaleState);
 
     // ------------------------------------------------------------ worker --
 
@@ -382,51 +445,67 @@
         return workerReady;
     }
 
-    function runInWorker(imageData, settings, onProgress) {
+    function discardWorker() {
+        if (svgWorker) svgWorker.terminate();
+        svgWorker = null;
+        workerReady = null;
+    }
+
+    /**
+     * Run one conversion in the worker. Replies are matched on `id`: two
+     * conversions used to share listeners, so the first "done" resolved both
+     * and the second image was shown (and saved) with the first one's result.
+     */
+    function runInWorker(conversion, imageData, settings, onProgress) {
         return new Promise((resolve, reject) => {
             const worker = svgWorker;
 
             const cleanup = () => {
                 worker.removeEventListener("message", onMessage);
                 worker.removeEventListener("error", onError);
+                conversion.abort = null;
             };
 
             const onMessage = (event) => {
                 const msg = event.data || {};
+                if (msg.id !== conversion.id) return;
                 if (msg.type === "progress") {
-                    onProgress(msg.progress, msg.label);
+                    onProgress(msg.progress);
                 } else if (msg.type === "done") {
                     cleanup();
                     resolve(msg.svg);
                 } else if (msg.type === "error") {
                     cleanup();
-                    reject(userError(describeError({ message: msg.message })));
+                    reject(userError(describeError({ message: msg.message, code: msg.code })));
                 }
             };
 
             const onError = (event) => {
                 cleanup();
                 // Force a fresh worker (and a fresh readiness probe) next time.
-                svgWorker = null;
-                workerReady = null;
+                discardWorker();
                 reject(userError("تعطّل معالج التحويل. أعد المحاولة.", event.message));
+            };
+
+            conversion.abort = () => {
+                cleanup();
+                const err = new Error("cancelled");
+                err.cancelled = true;
+                reject(err);
             };
 
             worker.addEventListener("message", onMessage);
             worker.addEventListener("error", onError);
             // Transfer the buffer instead of structured-cloning a copy of it.
             worker.postMessage(
-                { type: "convert", payload: { imageData, settings } },
+                { type: "convert", id: conversion.id, payload: { imageData, settings } },
                 [imageData.data.buffer]
             );
         });
     }
 
-    function runOnMainThread(imageData, settings, onProgress) {
-        onProgress(30, "جاري معالجة الألوان...");
-        SvgCore.applyGrayscaleFilter(imageData.data, settings.conversionType);
-        onProgress(50, "جاري إنشاء SVG...");
-        const svg = SvgCore.createSVG(
+    function runOnMainThread(imageData, settings) {
+        return SvgCore.createSVG(
             imageData.data,
             imageData.width,
             imageData.height,
@@ -434,31 +513,47 @@
             settings.detailLevel,
             settings.conversionType
         );
-        onProgress(100, "تم!");
-        return svg;
     }
 
     // -------------------------------------------------------- conversion --
 
+    /** { id, abort } while a conversion runs, otherwise null. */
+    let activeConversion = null;
+    let conversionSeq = 0;
+
     convertBtn.addEventListener("click", convertImage);
     downloadBtn.addEventListener("click", downloadSvg);
+    cancelBtn.addEventListener("click", cancelConversion);
 
-    function setProgress(progress, label) {
-        progressFill.style.width = progress + "%";
-        progressBar.setAttribute("aria-valuenow", String(Math.round(progress)));
+    function setProgress(percent, label) {
+        progressFill.style.width = percent + "%";
+        progressBar.setAttribute("aria-valuenow", String(Math.round(percent)));
         if (label) progressText.textContent = label;
     }
 
-    function captureImageData(settings) {
-        const width = Math.max(1, Math.floor(currentImage.width * settings.outputScale));
-        const height = Math.max(1, Math.floor(currentImage.height * settings.outputScale));
+    function setBusy(busy) {
+        convertBtn.disabled = busy || !currentImage;
+        newImageBtn.disabled = busy;
+        downloadBtn.disabled = busy || !currentSvg;
+        progressContainer.hidden = !busy;
+        if (!busy) cancelBtn.hidden = true;
+    }
+
+    function captureImageData(image, settings) {
+        const width = Math.max(1, Math.floor(image.naturalWidth * settings.outputScale));
+        const height = Math.max(1, Math.floor(image.naturalHeight * settings.outputScale));
 
         if (width > MAX_OUTPUT_DIMENSION || height > MAX_OUTPUT_DIMENSION ||
             width * height > MAX_OUTPUT_PIXELS) {
             throw userError(
                 `❌ الناتج المطلوب كبير جداً (${width}×${height}). ` +
-                "اختر مقياس إخراج أصغر."
+                "اختر دقة معالجة أقل."
             );
+        }
+        // Checked before allocating anything: the core would refuse anyway,
+        // but only after the canvas and pixel buffer had been built.
+        if (SvgCore.blockCount(width, height, settings.detailLevel) > SvgCore.MAX_BLOCKS) {
+            throw userError(TOO_COMPLEX_MESSAGE);
         }
 
         const canvas = document.createElement("canvas");
@@ -468,57 +563,81 @@
         if (!ctx) {
             throw userError("❌ متصفحك لا يدعم Canvas المطلوب للتحويل.");
         }
-        ctx.drawImage(currentImage, 0, 0, width, height);
+        // Transparent pixels stay transparent here; svg-core composites them
+        // onto white so a logo's background does not come out black.
+        ctx.drawImage(image, 0, 0, width, height);
 
         try {
             return ctx.getImageData(0, 0, width, height);
         } catch (err) {
-            throw userError("❌ تعذّر قراءة بيانات الصورة. جرّب مقياس إخراج أصغر.", err);
+            throw userError("❌ تعذّر قراءة بيانات الصورة. جرّب دقة معالجة أقل.", err);
         }
     }
 
     async function convertImage() {
-        if (!currentImage) return;
+        if (!currentImage || activeConversion) return;
 
-        const settings = {
-            conversionType: selectedConversionType(),
-            colorLevels: Number(colorLevelsSlider.value),
-            detailLevel: Number(detailLevelSlider.value),
-            outputScale: selectedOutputScale(),
-        };
+        const conversion = { id: ++conversionSeq, abort: null };
+        activeConversion = conversion;
+        const isCurrent = () => activeConversion === conversion;
+        const settings = readSettings();
+        const image = currentImage;
 
-        convertBtn.disabled = true;
-        downloadBtn.disabled = true;
+        setBusy(true);
         // A stale "تم التحويل بنجاح" next to a stale preview reads as if the
         // shown result matches the new settings.
         hideStatus();
-        progressContainer.hidden = false;
-        setProgress(10, "جاري تجهيز الصورة...");
+        setProgress(5, "جاري تجهيز الصورة...");
 
-        await sleep(50);
+        await sleep(50); // let the progress bar paint before the heavy work
+        if (!isCurrent()) return;
 
         try {
-            const imageData = captureImageData(settings);
+            const imageData = captureImageData(image, settings);
+            const useWorker = await ensureWorker();
+            if (!isCurrent()) return;
 
-            const svg = (await ensureWorker())
-                ? await runInWorker(imageData, settings, setProgress)
-                : runOnMainThread(imageData, settings, setProgress);
+            let svg;
+            setProgress(10, "جاري إنشاء SVG...");
+            if (useWorker) {
+                // Only the worker can be stopped mid-way; a main-thread run
+                // blocks the page, so offering "cancel" there would be a lie.
+                cancelBtn.hidden = false;
+                svg = await runInWorker(conversion, imageData, settings, (fraction) => {
+                    if (isCurrent()) setProgress(10 + fraction * 80, "جاري إنشاء SVG...");
+                });
+            } else {
+                svg = runOnMainThread(imageData, settings);
+            }
+            if (!isCurrent()) return;
 
             setProgress(95, "جاري عرض المعاينة...");
-            currentSvg = svg;
-            showSvgPreview(svg);
-
+            showSvgPreview(svg, settings);
             setProgress(100, "تم!");
             await sleep(300);
-            progressContainer.hidden = true;
-            convertBtn.disabled = false;
-            downloadBtn.disabled = false;
+            if (!isCurrent()) return;
+            activeConversion = null;
+            setBusy(false);
             showStatus("✅ تم التحويل بنجاح!", "success");
         } catch (error) {
-            progressContainer.hidden = true;
-            convertBtn.disabled = false;
+            if (!isCurrent() || error.cancelled) return;
+            activeConversion = null;
+            setBusy(false);
             showStatus(describeError(error), "error");
         }
+    }
+
+    function cancelConversion() {
+        const conversion = activeConversion;
+        if (!conversion) return;
+        activeConversion = null;
+        // Terminating is the only way to stop a busy worker; the next
+        // conversion probes a fresh one.
+        discardWorker();
+        if (conversion.abort) conversion.abort();
+        setBusy(false);
+        showStatus("تم إلغاء التحويل.", "info");
+        convertBtn.focus();
     }
 
     /**
@@ -528,7 +647,7 @@
      * handler attributes inside it can execute. As an image the browser
      * renders it inertly — scripts and handlers never run.
      */
-    function showSvgPreview(svg) {
+    function showSvgPreview(svg, settings) {
         releasePreviewUrl();
         const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
         previewObjectUrl = URL.createObjectURL(blob);
@@ -538,8 +657,11 @@
         img.alt = "معاينة الناتج المتجهي";
         svgPreview.replaceChildren(img);
 
+        currentSvg = svg;
+        currentSvgSize = blob.size;
+        currentSvgSettingsKey = settingsKey(settings);
         // The output size is the thing users actually need before downloading.
-        svgMeta.textContent = formatFileSize(blob.size);
+        refreshStaleState();
     }
 
     function svgFileName() {
@@ -586,7 +708,7 @@
 
         if (key === "o") {
             event.preventDefault();
-            fileInput.click();
+            if (!activeConversion) fileInput.click();
         } else if (event.key === "Enter") {
             if (convertBtn.disabled) return;
             event.preventDefault();
